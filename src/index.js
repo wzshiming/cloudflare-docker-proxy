@@ -6,26 +6,17 @@ addEventListener("fetch", (event) => {
 const dockerHub = "https://registry-1.docker.io";
 
 const routes = {
-  // production
-  ["docker." + CUSTOM_DOMAIN]: dockerHub,
-  ["quay." + CUSTOM_DOMAIN]: "https://quay.io",
-  ["gcr." + CUSTOM_DOMAIN]: "https://gcr.io",
-  ["k8s-gcr." + CUSTOM_DOMAIN]: "https://k8s.gcr.io",
-  ["k8s." + CUSTOM_DOMAIN]: "https://registry.k8s.io",
-  ["ghcr." + CUSTOM_DOMAIN]: "https://ghcr.io",
-  ["cloudsmith." + CUSTOM_DOMAIN]: "https://docker.cloudsmith.io",
-  ["ecr." + CUSTOM_DOMAIN]: "https://public.ecr.aws",
-
-  // staging
-  ["docker-staging." + CUSTOM_DOMAIN]: dockerHub,
+  ["docker"]: dockerHub,
+  ["quay"]: "https://quay.io",
+  ["gcr"]: "https://gcr.io",
+  ["k8s"]: "https://registry.k8s.io",
+  ["ghcr"]: "https://ghcr.io",
 };
 
 function routeByHosts(host) {
-  if (host in routes) {
-    return routes[host];
-  }
-  if (MODE == "debug") {
-    return TARGET_UPSTREAM;
+  const subdomain = host.split('.')[0]
+  if (subdomain in routes) {
+    return routes[subdomain];
   }
   return "";
 }
@@ -63,7 +54,7 @@ async function handleRequest(request) {
     return resp;
   }
   // get token
-  if (url.pathname == "/v2/auth") {
+  if (url.pathname == "/auth/token") {
     const newUrl = new URL(upstream + "/v2/");
     const resp = await fetch(newUrl.toString(), {
       method: "GET",
@@ -145,17 +136,12 @@ async function fetchToken(wwwAuthenticate, scope, authorization) {
 
 function responseUnauthorized(url) {
   const headers = new(Headers);
-  if (MODE == "debug") {
-    headers.set(
-      "Www-Authenticate",
-      `Bearer realm="http://${url.host}/v2/auth",service="cloudflare-docker-proxy"`
-    );
-  } else {
-    headers.set(
-      "Www-Authenticate",
-      `Bearer realm="https://${url.hostname}/v2/auth",service="cloudflare-docker-proxy"`
-    );
-  }
+
+  headers.set(
+    "Www-Authenticate",
+    `Bearer realm="${url.protocol}//${url.hostname}/auth/token",service="${url.hostname}"`
+  );
+  
   return new Response(JSON.stringify({ message: "UNAUTHORIZED" }), {
     status: 401,
     headers: headers,
